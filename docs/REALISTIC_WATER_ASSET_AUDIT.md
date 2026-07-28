@@ -89,3 +89,7 @@ The downloaded boat, ground, rock and seaweed demo assets are not instantiated: 
 | `realistic_water_shader/core/camera.gd` | 1,676 | Readable free-camera controller for the supplied demo; analyzed, not used because the game has a ship-follow camera. |
 | `realistic_water_shader/main.tscn` | 6,853 | Supplied static demo scene; analyzed for mesh subdivision, texture wiring, light and environment setup. |
 | `realistic_water_shader/water_env.tres` | 663 | Supplied WorldEnvironment resource; analyzed as Godot 4 environment configuration. |
+
+## Godot 4.3 hotfix
+
+Godot 4.3 exposes `TAU` as a built-in shader constant. The first integration accidentally declared it a second time, producing `Redefinition of 'TAU'` and causing the material compiler to fall back instead of rendering water. `RealisticOcean.gdshader` now uses the built-in directly and does not redeclare it.

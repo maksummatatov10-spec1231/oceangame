@@ -20,7 +20,6 @@ uniform float foam_strength : hint_range(0.0, 1.0) = 0.48;
 varying float wave_height;
 varying vec3 ocean_world_pos;
 
-const float TAU = 6.28318530718;
 
 // A Gerstner-style wave. Parameters are direction, amplitude, wavelength and
 // phase speed. The identical vertical equation exists in ocean_game.gd.
