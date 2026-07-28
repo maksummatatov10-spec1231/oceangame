@@ -22,7 +22,7 @@ shader_parameter/deep_color = Color(0.008, 0.075, 0.15, 1)
 shader_parameter/surface_color = Color(0.025, 0.31, 0.48, 1)
 shader_parameter/crest_color = Color(0.63, 0.88, 0.93, 1)
 shader_parameter/normal_strength = 1.15
-shader_parameter/foam_strength = 0.48
+shader_parameter/foam_strength = 0.16
 
 [node name="RealisticWaterPlane" type="MeshInstance3D"]
 mesh = SubResource("PlaneMesh_ocean")

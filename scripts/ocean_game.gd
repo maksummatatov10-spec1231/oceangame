@@ -229,12 +229,12 @@ func _check_treasures() -> void:
 # the same mathematical surface at bow, stern and both sides gives stable buoyancy.
 func _wave_height(x: float, z: float) -> float:
     return (
-        _gerstner_height(x, z, Vector2(0.92, 0.38), 1.45, 25.0, 2.40)
-        + _gerstner_height(x, z, Vector2(-0.35, 0.94), 1.10, 17.0, 3.10)
-        + _gerstner_height(x, z, Vector2(0.72, -0.69), 0.75, 11.0, 4.00)
-        + _gerstner_height(x, z, Vector2(-0.82, -0.57), 0.48, 7.0, 5.20)
-        + _gerstner_height(x, z, Vector2(0.15, 0.99), 0.27, 4.3, 6.50)
-        + _gerstner_height(x, z, Vector2(-0.98, 0.20), 0.16, 2.2, 8.00)
+        _gerstner_height(x, z, Vector2(0.93, 0.37), 0.42, 55.0, 1.25)
+        + _gerstner_height(x, z, Vector2(0.96, 0.28), 0.28, 40.0, 1.45)
+        + _gerstner_height(x, z, Vector2(0.89, 0.46), 0.17, 27.0, 1.75)
+        + _gerstner_height(x, z, Vector2(0.98, 0.18), 0.10, 18.0, 2.10)
+        + _gerstner_height(x, z, Vector2(0.92, 0.39), 0.05, 10.0, 2.45)
+        + _gerstner_height(x, z, Vector2(0.87, 0.49), 0.03, 6.0, 2.80)
     )
 
 func _gerstner_height(x: float, z: float, direction: Vector2, amplitude: float, wavelength: float, phase_speed: float) -> float:

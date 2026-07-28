@@ -15,7 +15,7 @@ uniform vec3 deep_color : source_color = vec3(0.008, 0.075, 0.15);
 uniform vec3 surface_color : source_color = vec3(0.025, 0.31, 0.48);
 uniform vec3 crest_color : source_color = vec3(0.63, 0.88, 0.93);
 uniform float normal_strength : hint_range(0.0, 2.0) = 1.15;
-uniform float foam_strength : hint_range(0.0, 1.0) = 0.48;
+uniform float foam_strength : hint_range(0.0, 1.0) = 0.16;
 
 varying float wave_height;
 varying vec3 ocean_world_pos;
@@ -30,12 +30,12 @@ float gerstner_height(vec2 position, vec2 direction, float amplitude, float wave
 
 float ocean_height(vec2 position) {
     float h = 0.0;
-    h += gerstner_height(position, vec2(0.92, 0.38), 1.45, 25.0, 2.40);
-    h += gerstner_height(position, vec2(-0.35, 0.94), 1.10, 17.0, 3.10);
-    h += gerstner_height(position, vec2(0.72, -0.69), 0.75, 11.0, 4.00);
-    h += gerstner_height(position, vec2(-0.82, -0.57), 0.48, 7.0, 5.20);
-    h += gerstner_height(position, vec2(0.15, 0.99), 0.27, 4.3, 6.50);
-    h += gerstner_height(position, vec2(-0.98, 0.20), 0.16, 2.2, 8.00);
+    h += gerstner_height(position, vec2(0.93, 0.37), 0.42, 55.0, 1.25);
+    h += gerstner_height(position, vec2(0.96, 0.28), 0.28, 40.0, 1.45);
+    h += gerstner_height(position, vec2(0.89, 0.46), 0.17, 27.0, 1.75);
+    h += gerstner_height(position, vec2(0.98, 0.18), 0.10, 18.0, 2.10);
+    h += gerstner_height(position, vec2(0.92, 0.39), 0.05, 10.0, 2.45);
+    h += gerstner_height(position, vec2(0.87, 0.49), 0.03, 6.0, 2.80);
     return h;
 }
 
@@ -47,12 +47,12 @@ vec2 wave_slope(vec2 position, vec2 direction, float amplitude, float wavelength
 
 vec2 ocean_slope(vec2 position) {
     vec2 slope = vec2(0.0);
-    slope += wave_slope(position, vec2(0.92, 0.38), 1.45, 25.0, 2.40);
-    slope += wave_slope(position, vec2(-0.35, 0.94), 1.10, 17.0, 3.10);
-    slope += wave_slope(position, vec2(0.72, -0.69), 0.75, 11.0, 4.00);
-    slope += wave_slope(position, vec2(-0.82, -0.57), 0.48, 7.0, 5.20);
-    slope += wave_slope(position, vec2(0.15, 0.99), 0.27, 4.3, 6.50);
-    slope += wave_slope(position, vec2(-0.98, 0.20), 0.16, 2.2, 8.00);
+    slope += wave_slope(position, vec2(0.93, 0.37), 0.42, 55.0, 1.25);
+    slope += wave_slope(position, vec2(0.96, 0.28), 0.28, 40.0, 1.45);
+    slope += wave_slope(position, vec2(0.89, 0.46), 0.17, 27.0, 1.75);
+    slope += wave_slope(position, vec2(0.98, 0.18), 0.10, 18.0, 2.10);
+    slope += wave_slope(position, vec2(0.92, 0.39), 0.05, 10.0, 2.45);
+    slope += wave_slope(position, vec2(0.87, 0.49), 0.03, 6.0, 2.80);
     return slope;
 }
 
@@ -69,7 +69,7 @@ void fragment() {
     // patterns and provide detailed ripples independently of the large waves.
     vec2 world_uv = ocean_world_pos.xz;
     vec2 flow_a = vec2(0.035, 0.022) * TIME;
-    vec2 flow_b = vec2(-0.021, 0.041) * TIME;
+    vec2 flow_b = vec2(0.024, 0.016) * TIME;
     vec2 distortion = (texture(uv_sampler, world_uv * 0.035 + flow_b).rg * 2.0 - 1.0) * 0.18;
     vec3 normal_a = texture(normalmap_a_sampler, world_uv * 0.075 + flow_a + distortion).rgb;
     vec3 normal_b = texture(normalmap_b_sampler, world_uv * 0.19 + flow_b - distortion).rgb;
@@ -77,8 +77,8 @@ void fragment() {
     NORMAL_MAP_DEPTH = normal_strength;
 
     float fresnel = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 4.2);
-    float crest = smoothstep(1.55, 3.45, wave_height);
-    float foam = texture(foam_sampler, world_uv * 0.16 + flow_a * 1.8).r;
+    float crest = smoothstep(0.68, 1.02, wave_height);
+    float foam = texture(foam_sampler, world_uv * 0.11 + flow_a * 1.15).r;
     foam = smoothstep(0.50, 0.82, foam) * crest * foam_strength;
     vec3 water = mix(deep_color, surface_color, fresnel * 0.92 + 0.08);
     ALBEDO = mix(water, crest_color, foam);
