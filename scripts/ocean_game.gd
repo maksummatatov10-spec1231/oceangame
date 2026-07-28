@@ -14,6 +14,7 @@ var camera: Camera3D
 var speed := 0.0
 var heading := 0.0
 var elapsed := 0.0
+var heave_velocity := 0.0
 var treasures: Array[Node3D] = []
 var collected := 0
 var speed_label: Label
@@ -192,13 +193,12 @@ func _physics_process(delta: float) -> void:
     var steering := Input.get_axis("turn_left", "turn_right")
     if abs(speed) > 0.1:
         heading -= steering * TURN_SPEED * delta * clamp(abs(speed) / 5.0, 0.25, 1.4) * sign(speed)
-    ship.rotation.y = heading
-    ocean.global_position = Vector3(ship.global_position.x, 0.0, ship.global_position.z)
-    var forward := -ship.global_transform.basis.z
+    # Movement is calculated from yaw only: the visible pitch/roll below must
+    # never steer the ship upward or sideways.
+    var forward := Vector3(-sin(heading), 0.0, -cos(heading))
     ship.position += forward * speed * delta
-    ship.position.y = 1.35 + _wave_height(ship.position.x, ship.position.z) * 0.18
-    ship.rotation.x = sin(elapsed * 1.3 + ship.position.z * 0.06) * 0.045
-    ship.rotation.z = sin(elapsed * 1.1 + ship.position.x * 0.05) * 0.055
+    ocean.global_position = Vector3(ship.global_position.x, 0.0, ship.global_position.z)
+    _apply_buoyancy(delta, forward)
     sailor.position.y = 0.75 + sin(elapsed * 2.2) * 0.025
     _update_camera(delta)
     _check_treasures()
@@ -225,8 +225,36 @@ func _check_treasures() -> void:
                 message_label.text = "Все маяки найдены — океан ваш, капитан!"
                 message_time = 99.0
 
+# Must mirror large_waves() in shaders/Water.gdshader. Sampling the same
+# mathematical surface at bow, stern and both sides gives stable buoyancy.
 func _wave_height(x: float, z: float) -> float:
-    return sin(x * 0.115 + elapsed * 0.8) * 0.52 + sin(z * 0.1575 - elapsed * 0.624) * 0.29 + sin((x + z) * 0.0713 + elapsed) * 0.19
+    var wave_a := 1.80 * sin((x * 0.95 + z * 0.31) * TAU / 21.0 - elapsed * 1.50)
+    var wave_b := 1.15 * sin((x * -0.38 + z * 0.925) * TAU / 13.0 - elapsed * 2.10)
+    var wave_c := 0.75 * sin((x * 0.72 + z * -0.694) * TAU / 7.0 - elapsed * 2.80)
+    var wave_d := 0.30 * sin((x * -0.16 + z * 0.987) * TAU / 3.5 - elapsed * 4.00)
+    return wave_a + wave_b + wave_c + wave_d
+
+func _apply_buoyancy(delta: float, forward: Vector3) -> void:
+    var right := Vector3(cos(heading), 0.0, -sin(heading))
+    var center := ship.global_position
+    var bow_height := _wave_height(center.x + forward.x * 3.7, center.z + forward.z * 3.7)
+    var stern_height := _wave_height(center.x - forward.x * 3.7, center.z - forward.z * 3.7)
+    var right_height := _wave_height(center.x + right.x * 1.65, center.z + right.z * 1.65)
+    var left_height := _wave_height(center.x - right.x * 1.65, center.z - right.z * 1.65)
+    var target_height := (bow_height + stern_height + right_height + left_height) * 0.25 + 0.72
+    # A critically damped-ish spring adds believable delayed heave rather than
+    # teleporting the hull to every crest.
+    heave_velocity += (target_height - ship.position.y) * 30.0 * delta
+    heave_velocity *= exp(-5.2 * delta)
+    ship.position.y += heave_velocity * delta
+    var target_pitch := atan2(bow_height - stern_height, 7.4)
+    var target_roll := atan2(right_height - left_height, 3.3)
+    var rotation_blend := 1.0 - exp(-5.5 * delta)
+    ship.rotation = Vector3(
+        lerp_angle(ship.rotation.x, target_pitch, rotation_blend),
+        heading,
+        lerp_angle(ship.rotation.z, target_roll, rotation_blend)
+    )
 
 func _material(color: Color, roughness: float = 0.75, emission_energy: float = 0.0) -> StandardMaterial3D:
     var material := StandardMaterial3D.new()

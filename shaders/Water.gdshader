@@ -68,20 +68,30 @@ float waveheight(vec2 offset, int mode) {
 	return 0.0;
 }
 
+// Four Gerstner-style vertical swells. Their equations are mirrored in
+// ocean_game.gd so the boat rides exactly the same water surface.
+float large_waves(vec2 p, float t) {
+	float a = 1.80 * sin(dot(p, vec2(0.95, 0.31)) * (6.283185 / 21.0) - t * 1.50);
+	float b = 1.15 * sin(dot(p, vec2(-0.38, 0.925)) * (6.283185 / 13.0) - t * 2.10);
+	float c = 0.75 * sin(dot(p, vec2(0.72, -0.694)) * (6.283185 / 7.0) - t * 2.80);
+	float d = 0.30 * sin(dot(p, vec2(-0.16, 0.987)) * (6.283185 / 3.5) - t * 4.00);
+	return a + b + c + d;
+}
+
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	vertex_distance = clamp(distance(world_pos, ocean_pos), 0.0, 85.0);
-	vertex_distance_clamped = vertex_distance / 85.0;
+	vertex_distance = clamp(distance(world_pos, ocean_pos), 0.0, 210.0);
+	vertex_distance_clamped = vertex_distance / 210.0;
 
+	// Fine, noisy ripples still come from the supplied NoiseTexture2D.
 	float height_mix = waveheight(vec2(0.0), 2);
-	// `wave` is the original NoiseTexture2D from WaterPlane.tscn. Centre it
-	// around zero, then layer broad moving swells over it for a readable ocean.
-	float texture_wave = (height_mix - 0.5) * height_scale * 0.78;
-	float time = TIME * time_scale;
-	float swell_a = sin(world_pos.x * 0.34 + world_pos.z * 0.11 + time * 3.4) * 0.34;
-	float swell_b = sin(world_pos.z * 0.22 - world_pos.x * 0.16 - time * 2.3) * 0.24;
-	float wave_falloff = 1.0 - vertex_distance_clamped;
-	VERTEX.y += (texture_wave + swell_a + swell_b) * wave_falloff;
+	float texture_wave = (height_mix - 0.5) * height_scale * 0.32;
+	float ocean_swell = large_waves(world_pos.xz, TIME);
+	// Keep the close 95 m fully detailed, then fade waves only at the distant
+	// LOD horizon. The parent tile grid continually follows the ship.
+	float wave_falloff = 1.0 - smoothstep(95.0, 190.0, vertex_distance);
+	height = (texture_wave + ocean_swell) * wave_falloff;
+	VERTEX.y += height;
 }
 
 void fragment() {
@@ -103,7 +113,9 @@ void fragment() {
 	);
 	float rim = fresnel(5.0, NORMAL, VIEW);
 	float moving_crest = clamp(wave_normal_blend.r * 0.22, 0.0, 0.22);
-	ALBEDO = mix(albedo, albedo2, clamp(rim * 0.72 + moving_crest, 0.0, 1.0));
+	float crest_foam = smoothstep(2.35, 3.75, height) * 0.33;
+	vec3 water_color = mix(albedo, albedo2, clamp(rim * 0.72 + moving_crest, 0.0, 1.0));
+	ALBEDO = mix(water_color, vec3(0.72, 0.88, 0.92), crest_foam);
 	METALLIC = metallic;
 	ROUGHNESS = roughness;
 	NORMAL_MAP = mix(wave_normal_blend, normal_blend, 0.5);
