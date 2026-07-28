@@ -29,13 +29,17 @@ float gerstner_height(vec2 position, vec2 direction, float amplitude, float wave
 }
 
 float ocean_height(vec2 position) {
+    // Compact, tall wave train: more crests in view, but each crest remains
+    // rounded because amplitudes taper down on the shortest wavelengths.
     float h = 0.0;
-    h += gerstner_height(position, vec2(0.93, 0.37), 0.16, 65.0, 0.85);
-    h += gerstner_height(position, vec2(0.96, 0.28), 0.10, 48.0, 1.00);
-    h += gerstner_height(position, vec2(0.89, 0.46), 0.06, 32.0, 1.25);
-    h += gerstner_height(position, vec2(0.98, 0.18), 0.035, 22.0, 1.45);
-    h += gerstner_height(position, vec2(0.92, 0.39), 0.015, 13.0, 1.70);
-    h += gerstner_height(position, vec2(0.87, 0.49), 0.008, 7.0, 1.95);
+    h += gerstner_height(position, vec2(0.94, 0.34), 0.62, 18.0, 1.65);
+    h += gerstner_height(position, vec2(0.98, 0.20), 0.46, 13.0, 2.05);
+    h += gerstner_height(position, vec2(0.90, 0.44), 0.36, 10.0, 2.45);
+    h += gerstner_height(position, vec2(0.99, 0.08), 0.28, 7.5, 2.90);
+    h += gerstner_height(position, vec2(0.86, 0.51), 0.22, 5.5, 3.40);
+    h += gerstner_height(position, vec2(0.96, 0.28), 0.16, 4.0, 3.90);
+    h += gerstner_height(position, vec2(0.82, 0.57), 0.12, 3.0, 4.35);
+    h += gerstner_height(position, vec2(1.0, -0.05), 0.08, 2.2, 4.85);
     return h;
 }
 
@@ -47,12 +51,14 @@ vec2 wave_slope(vec2 position, vec2 direction, float amplitude, float wavelength
 
 vec2 ocean_slope(vec2 position) {
     vec2 slope = vec2(0.0);
-    slope += wave_slope(position, vec2(0.93, 0.37), 0.16, 65.0, 0.85);
-    slope += wave_slope(position, vec2(0.96, 0.28), 0.10, 48.0, 1.00);
-    slope += wave_slope(position, vec2(0.89, 0.46), 0.06, 32.0, 1.25);
-    slope += wave_slope(position, vec2(0.98, 0.18), 0.035, 22.0, 1.45);
-    slope += wave_slope(position, vec2(0.92, 0.39), 0.015, 13.0, 1.70);
-    slope += wave_slope(position, vec2(0.87, 0.49), 0.008, 7.0, 1.95);
+    slope += wave_slope(position, vec2(0.94, 0.34), 0.62, 18.0, 1.65);
+    slope += wave_slope(position, vec2(0.98, 0.20), 0.46, 13.0, 2.05);
+    slope += wave_slope(position, vec2(0.90, 0.44), 0.36, 10.0, 2.45);
+    slope += wave_slope(position, vec2(0.99, 0.08), 0.28, 7.5, 2.90);
+    slope += wave_slope(position, vec2(0.86, 0.51), 0.22, 5.5, 3.40);
+    slope += wave_slope(position, vec2(0.96, 0.28), 0.16, 4.0, 3.90);
+    slope += wave_slope(position, vec2(0.82, 0.57), 0.12, 3.0, 4.35);
+    slope += wave_slope(position, vec2(1.0, -0.05), 0.08, 2.2, 4.85);
     return slope;
 }
 
@@ -77,7 +83,7 @@ void fragment() {
     NORMAL_MAP_DEPTH = normal_strength;
 
     float fresnel = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 4.2);
-    float crest = smoothstep(0.24, 0.36, wave_height);
+    float crest = smoothstep(0.90, 1.65, wave_height);
     float foam = texture(foam_sampler, world_uv * 0.11 + flow_a * 1.15).r;
     foam = smoothstep(0.50, 0.82, foam) * crest * foam_strength;
     vec3 water = mix(deep_color, surface_color, fresnel * 0.92 + 0.08);

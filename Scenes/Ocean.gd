@@ -5,7 +5,7 @@ const OCEAN_TILE := preload("res://Scenes/RealisticWaterPlane.tscn")
 # vertex waves meet the low-subdivision outer tiles of the original demo.
 const TILE_SIZE := 80.0
 const TILES_PER_AXIS := 3
-const TILE_SUBDIVISIONS := 128
+const TILE_SUBDIVISIONS := 160
 const HALF_GRID := 1
 
 func _ready() -> void:
