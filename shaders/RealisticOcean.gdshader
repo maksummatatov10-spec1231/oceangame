@@ -16,6 +16,7 @@ uniform vec3 surface_color : source_color = vec3(0.025, 0.31, 0.48);
 uniform vec3 crest_color : source_color = vec3(0.63, 0.88, 0.93);
 uniform float normal_strength : hint_range(0.0, 2.0) = 1.15;
 uniform float foam_strength : hint_range(0.0, 1.0) = 0.16;
+uniform float wave_strength : hint_range(0.2, 1.5) = 0.72;
 
 varying float wave_height;
 varying vec3 ocean_world_pos;
@@ -64,9 +65,9 @@ vec2 ocean_slope(vec2 position) {
 
 void vertex() {
     ocean_world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-    wave_height = ocean_height(ocean_world_pos.xz);
+    wave_height = ocean_height(ocean_world_pos.xz) * wave_strength;
     VERTEX.y += wave_height;
-    vec2 slope = ocean_slope(ocean_world_pos.xz);
+    vec2 slope = ocean_slope(ocean_world_pos.xz) * wave_strength;
     NORMAL = normalize(vec3(-slope.x, 1.0, -slope.y));
 }
 
@@ -83,7 +84,7 @@ void fragment() {
     NORMAL_MAP_DEPTH = normal_strength;
 
     float fresnel = pow(1.0 - clamp(dot(normalize(NORMAL), normalize(VIEW)), 0.0, 1.0), 4.2);
-    float crest = smoothstep(0.90, 1.65, wave_height);
+    float crest = smoothstep(0.90 * wave_strength, 1.65 * wave_strength, wave_height);
     float foam = texture(foam_sampler, world_uv * 0.11 + flow_a * 1.15).r;
     foam = smoothstep(0.50, 0.82, foam) * crest * foam_strength;
     vec3 water = mix(deep_color, surface_color, fresnel * 0.92 + 0.08);

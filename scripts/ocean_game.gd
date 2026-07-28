@@ -7,20 +7,24 @@ const REVERSE_SPEED := 6.0
 const ACCELERATION := 4.5
 const TURN_SPEED := 1.35
 
-var ship: Node3D
+var ship: RigidBody3D
 var ocean: Node3D
 var sailor: Node3D
 var camera: Camera3D
-var speed := 0.0
-var heading := 0.0
 var elapsed := 0.0
-var heave_velocity := 0.0
 var treasures: Array[Node3D] = []
 var collected := 0
 var speed_label: Label
 var objective_label: Label
 var message_label: Label
 var message_time := 5.0
+var environment: Environment
+var sun: DirectionalLight3D
+var weather_strength := 0.72
+var weather_target := 0.72
+var weather_name := "Лёгкий ветер"
+var weather_label: Label
+var rain: GPUParticles3D
 
 func _ready() -> void:
     _create_environment()
@@ -36,7 +40,7 @@ func _create_environment() -> void:
     sky_material.panorama = SUNSET_PANORAMA
     var sky := Sky.new()
     sky.sky_material = sky_material
-    var environment := Environment.new()
+    environment = Environment.new()
     environment.background_mode = Environment.BG_SKY
     environment.sky = sky
     environment.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
@@ -51,12 +55,33 @@ func _create_environment() -> void:
     var world := WorldEnvironment.new()
     world.environment = environment
     add_child(world)
-    var sun := DirectionalLight3D.new()
+    sun = DirectionalLight3D.new()
     sun.rotation_degrees = Vector3(-38, -32, 0)
     sun.light_color = Color("ffd1a0")
     sun.light_energy = 2.0
     sun.shadow_enabled = true
     add_child(sun)
+    rain = GPUParticles3D.new()
+    rain.amount = 1400
+    rain.lifetime = 1.3
+    rain.visibility_aabb = AABB(Vector3(-28, -8, -28), Vector3(56, 30, 56))
+    var rain_process := ParticleProcessMaterial.new()
+    rain_process.direction = Vector3(0, -1, 0)
+    rain_process.spread = 7.0
+    rain_process.initial_velocity_min = 16.0
+    rain_process.initial_velocity_max = 23.0
+    rain_process.gravity = Vector3(0, -8, 0)
+    var rain_drop := QuadMesh.new()
+    rain_drop.size = Vector2(0.025, 0.65)
+    var rain_material := StandardMaterial3D.new()
+    rain_material.albedo_color = Color(0.67, 0.82, 0.96, 0.48)
+    rain_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    rain_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    rain_drop.material = rain_material
+    rain.process_material = rain_process
+    rain.draw_pass_1 = rain_drop
+    rain.amount_ratio = 0.0
+    add_child(rain)
 
 func _create_ocean() -> void:
     # Keeps the original 17-tile infinite LOD layout from ассеты1.zip, now
@@ -68,10 +93,18 @@ func _create_ocean() -> void:
     add_child(ocean)
 
 func _create_ship() -> void:
-    ship = Node3D.new()
+    ship = RigidBody3D.new()
+    ship.set_script(preload("res://scripts/boat_physics.gd"))
     ship.name = "PlayerShip"
-    ship.position = Vector3(0, 1.35, 10)
+    ship.position = Vector3(0, 1.5, 10)
+    ship.set("ocean", self)
     add_child(ship)
+    var hull_collision := CollisionShape3D.new()
+    var hull_shape := BoxShape3D.new()
+    hull_shape.size = Vector3(3.2, 1.35, 7.6)
+    hull_collision.shape = hull_shape
+    hull_collision.position = Vector3(0, -0.35, 0)
+    ship.add_child(hull_collision)
     var wood := _material(Color("4b2417"), 0.78)
     var dark_wood := _material(Color("24100c"), 0.82)
     var trim := _material(Color("d49a48"), 0.5, 0.15)
@@ -162,8 +195,13 @@ func _create_interface() -> void:
     speed_label.position = Vector2(30, 91)
     speed_label.add_theme_font_size_override("font_size", 16)
     layer.add_child(speed_label)
+    weather_label = Label.new()
+    weather_label.position = Vector2(30, 118)
+    weather_label.add_theme_font_size_override("font_size", 16)
+    weather_label.add_theme_color_override("font_color", Color("d5e8f5"))
+    layer.add_child(weather_label)
     var controls := Label.new()
-    controls.text = "W / S — ход     A / D — штурвал     Shift — полный парус     R — заново"
+    controls.text = "W / S — ход   A / D — штурвал   Shift — полный ход   1/2/3 — погода   R — заново"
     controls.position = Vector2(30, 680)
     controls.add_theme_font_size_override("font_size", 15)
     controls.add_theme_color_override("font_color", Color("d5e8f5"))
@@ -182,30 +220,47 @@ func _physics_process(delta: float) -> void:
     elapsed += delta
     if Input.is_action_just_pressed("restart"):
         get_tree().reload_current_scene()
-    var target_speed := 0.0
-    if Input.is_action_pressed("throttle"):
-        target_speed = MAX_SPEED * (1.35 if Input.is_action_pressed("boost") else 1.0)
-    elif Input.is_action_pressed("reverse"):
-        target_speed = -REVERSE_SPEED
-    speed = move_toward(speed, target_speed, ACCELERATION * delta)
-    var steering := Input.get_axis("turn_left", "turn_right")
-    if abs(speed) > 0.1:
-        heading -= steering * TURN_SPEED * delta * clamp(abs(speed) / 5.0, 0.25, 1.4) * sign(speed)
-    # Movement is calculated from yaw only: the visible pitch/roll below must
-    # never steer the ship upward or sideways.
-    var forward := Vector3(-sin(heading), 0.0, -cos(heading))
-    ship.position += forward * speed * delta
+    if Input.is_action_just_pressed("weather_calm"):
+        _select_weather("Штиль", 0.28)
+    elif Input.is_action_just_pressed("weather_breeze"):
+        _select_weather("Лёгкий ветер", 0.72)
+    elif Input.is_action_just_pressed("weather_storm"):
+        _select_weather("Шторм", 1.35)
+    # Eight seconds from calm to storm: water, light and fog transition together.
+    weather_strength = move_toward(weather_strength, weather_target, delta * 0.13)
+    _apply_weather()
     ocean.global_position = Vector3(ship.global_position.x, 0.0, ship.global_position.z)
-    _apply_buoyancy(delta, forward)
-    sailor.position.y = 0.75 + sin(elapsed * 2.2) * 0.025
     _update_camera(delta)
     _check_treasures()
     objective_label.text = "МАЯКИ: %d / %d" % [collected, treasures.size()]
-    speed_label.text = "СКОРОСТЬ: %02d узлов" % round(abs(speed) * 2.1)
+    speed_label.text = "СКОРОСТЬ: %02d узлов" % round(float(ship.get("speed_knots")))
+    weather_label.text = "ПОГОДА: %s" % weather_name
     if message_time > 0.0:
         message_time -= delta
         if message_time <= 0.0:
             message_label.text = ""
+
+func _select_weather(title: String, strength: float) -> void:
+    weather_name = title
+    weather_target = strength
+    message_time = 3.0
+    message_label.text = "Погода меняется: %s" % title
+
+func _apply_weather() -> void:
+    var storm_ratio := inverse_lerp(0.28, 1.35, weather_strength)
+    environment.fog_density = lerp(0.004, 0.018, storm_ratio)
+    environment.fog_light_color = Color("6b8da6").lerp(Color("43566c"), storm_ratio)
+    environment.ambient_light_energy = lerp(0.78, 0.34, storm_ratio)
+    sun.light_energy = lerp(2.0, 0.65, storm_ratio)
+    sun.light_color = Color("ffd1a0").lerp(Color("a7b7ce"), storm_ratio)
+    rain.global_position = ship.global_position + Vector3(0, 12, 0)
+    rain.amount_ratio = smoothstep(0.55, 1.0, storm_ratio)
+    for tile in ocean.get_children():
+        if tile is MeshInstance3D and tile.material_override is ShaderMaterial:
+            (tile.material_override as ShaderMaterial).set_shader_parameter("wave_strength", weather_strength)
+
+func get_water_sample(world_position: Vector3) -> Dictionary:
+    return OceanModel.sample(world_position, elapsed, weather_strength)
 
 func _update_camera(delta: float) -> void:
     var desired := ship.global_position + ship.global_transform.basis.z * 13.5 + Vector3(0, 7.5, 0)
@@ -222,46 +277,6 @@ func _check_treasures() -> void:
             if collected == treasures.size():
                 message_label.text = "Все маяки найдены — океан ваш, капитан!"
                 message_time = 99.0
-
-# Must mirror ocean_height() in shaders/RealisticOcean.gdshader. Sampling
-# the same mathematical surface at bow, stern and both sides gives stable buoyancy.
-func _wave_height(x: float, z: float) -> float:
-    return (
-        _gerstner_height(x, z, Vector2(0.94, 0.34), 0.62, 18.0, 1.65)
-        + _gerstner_height(x, z, Vector2(0.98, 0.20), 0.46, 13.0, 2.05)
-        + _gerstner_height(x, z, Vector2(0.90, 0.44), 0.36, 10.0, 2.45)
-        + _gerstner_height(x, z, Vector2(0.99, 0.08), 0.28, 7.5, 2.90)
-        + _gerstner_height(x, z, Vector2(0.86, 0.51), 0.22, 5.5, 3.40)
-        + _gerstner_height(x, z, Vector2(0.96, 0.28), 0.16, 4.0, 3.90)
-        + _gerstner_height(x, z, Vector2(0.82, 0.57), 0.12, 3.0, 4.35)
-        + _gerstner_height(x, z, Vector2(1.0, -0.05), 0.08, 2.2, 4.85)
-    )
-
-func _gerstner_height(x: float, z: float, direction: Vector2, amplitude: float, wavelength: float, phase_speed: float) -> float:
-    var phase := TAU / wavelength * direction.normalized().dot(Vector2(x, z)) - elapsed * phase_speed
-    return amplitude * sin(phase)
-
-func _apply_buoyancy(delta: float, forward: Vector3) -> void:
-    var right := Vector3(cos(heading), 0.0, -sin(heading))
-    var center := ship.global_position
-    var bow_height := _wave_height(center.x + forward.x * 3.7, center.z + forward.z * 3.7)
-    var stern_height := _wave_height(center.x - forward.x * 3.7, center.z - forward.z * 3.7)
-    var right_height := _wave_height(center.x + right.x * 1.65, center.z + right.z * 1.65)
-    var left_height := _wave_height(center.x - right.x * 1.65, center.z - right.z * 1.65)
-    var target_height := (bow_height + stern_height + right_height + left_height) * 0.25 + 0.72
-    # A critically damped-ish spring adds believable delayed heave rather than
-    # teleporting the hull to every crest.
-    heave_velocity += (target_height - ship.position.y) * 30.0 * delta
-    heave_velocity *= exp(-5.2 * delta)
-    ship.position.y += heave_velocity * delta
-    var target_pitch := atan2(bow_height - stern_height, 7.4)
-    var target_roll := atan2(right_height - left_height, 3.3)
-    var rotation_blend := 1.0 - exp(-5.5 * delta)
-    ship.rotation = Vector3(
-        lerp_angle(ship.rotation.x, target_pitch, rotation_blend),
-        heading,
-        lerp_angle(ship.rotation.z, target_roll, rotation_blend)
-    )
 
 func _material(color: Color, roughness: float = 0.75, emission_energy: float = 0.0) -> StandardMaterial3D:
     var material := StandardMaterial3D.new()

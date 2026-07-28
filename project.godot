@@ -26,6 +26,20 @@ turn_right={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":68)
 boost={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":4194325)]}
 restart={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":82)]}
 
+
+weather_calm={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":49)]
+}
+weather_breeze={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":50)]
+}
+weather_storm={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"physical_keycode":51)]
+}
+
 [shader_globals]
 ocean_pos={
 "type": "vec3",
