@@ -65,35 +65,23 @@ float waveheight(vec2 offset, int mode) {
 			hmix = mix(h1, h2, 0.5);
 			return hmix;
 	}
+	return 0.0;
 }
 
 void vertex() {
 	world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	
-	vertex_distance = distance(world_pos,ocean_pos);
-	vertex_distance = clamp(vertex_distance, 0.0, 85.0);
+	vertex_distance = clamp(distance(world_pos, ocean_pos), 0.0, 85.0);
 	vertex_distance_clamped = vertex_distance / 85.0;
-	
-	float prev_height_x = waveheight(vec2(-0.3,0.0),2);
-	float next_height_x = waveheight(vec2(0.3,0.0),2);
-	float prev_height_y = waveheight(vec2(0.0,-0.3),2);
-	float next_height_y = waveheight(vec2(0.0,0.3),2);
-	float height_mix = waveheight(vec2(0.0,0.0),2);
-	
-	VERTEX.y += height_mix * height_scale * (1.0 - vertex_distance_clamped);
-	
-	float fraction_x = fract(round(UV.x * 1000.0) / 10.0);
-	float fraction_y = fract(round(UV.y * 1000.0) / 10.0);
-	if (fraction_x != 0.0) {
-		if (fract(UV.y) == 0.0) {
-			VERTEX.y = ((prev_height_x + next_height_x) * height_scale * (1.0 - vertex_distance_clamped)) / 2.0;
-		}
-	}
-	if (fraction_y != 0.0) {
-		if (fract(UV.x) == 0.0) {
-			VERTEX.y = ((prev_height_y + next_height_y) * height_scale * (1.0 - vertex_distance_clamped)) / 2.0;
-		}
-	}
+
+	float height_mix = waveheight(vec2(0.0), 2);
+	// `wave` is the original NoiseTexture2D from WaterPlane.tscn. Centre it
+	// around zero, then layer broad moving swells over it for a readable ocean.
+	float texture_wave = (height_mix - 0.5) * height_scale * 0.78;
+	float time = TIME * time_scale;
+	float swell_a = sin(world_pos.x * 0.34 + world_pos.z * 0.11 + time * 3.4) * 0.34;
+	float swell_b = sin(world_pos.z * 0.22 - world_pos.x * 0.16 - time * 2.3) * 0.24;
+	float wave_falloff = 1.0 - vertex_distance_clamped;
+	VERTEX.y += (texture_wave + swell_a + swell_b) * wave_falloff;
 }
 
 void fragment() {

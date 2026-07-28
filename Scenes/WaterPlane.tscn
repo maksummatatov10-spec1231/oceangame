@@ -1,6 +1,6 @@
 [gd_scene load_steps=12 format=3 uid="uid://dbt5pfn1trdyj"]
 
-[ext_resource type="Shader" path="res://Shaders/Water.gdshader" id="1_w1tkc"]
+[ext_resource type="Shader" path="res://shaders/Water.gdshader" id="1_w1tkc"]
 
 [sub_resource type="PlaneMesh" id="PlaneMesh_gg3e2"]
 resource_local_to_scene = true
