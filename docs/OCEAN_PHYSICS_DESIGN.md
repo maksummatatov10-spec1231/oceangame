@@ -26,3 +26,9 @@ The weather profiles now change more than one multiplier: **swell**, **short-wav
 ## Input and visible weather hotfix
 
 Weather keys are now handled in `_input`, which receives keyboard events before GUI handling, rather than relying solely on unhandled actions. The bottom HUD explicitly names every weather key. Storm visuals use a world-space rain particle box around the ship, a smooth fog/light transition, and a three-layer storm-cloud deck that follows the vessel and fades in with storm intensity. Water materials are updated through `get_active_material(0)`, which works whether Godot stores the shader on a surface override or a material override.
+
+## Stability and storm-cloud pass
+
+A buoyancy force must be distributed across probes; applying the full restoring and impact force at every pontoon multiplies the force and can eject a rigid body during a storm. The pontoon system now clamps the **total** lift and slam force, then divides it across all twelve probes. The storm profile also uses moderated swell/chop values. Rudder authority has a small low-speed minimum so clear-weather manoeuvring remains possible.
+
+The earlier cloud primitives have been replaced with a three-layer procedural cloud shader (`shaders/StormClouds.gdshader`). It uses scrolling fractal value noise with density thresholding, derived from the layered-density principle used in Godot volumetric-cloud shaders. Full raymarching would require 3D noise and substantially more GPU work; this cloud deck preserves animated storm coverage on the project's Compatibility renderer.

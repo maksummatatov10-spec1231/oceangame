@@ -30,7 +30,7 @@ var weather_name := "Лёгкий ветер"
 var weather_label: Label
 var rain: GPUParticles3D
 var storm_clouds: Array[MeshInstance3D] = []
-var cloud_material: StandardMaterial3D
+var cloud_material: ShaderMaterial
 
 func _ready() -> void:
     _create_environment()
@@ -93,22 +93,22 @@ func _create_environment() -> void:
     rain.emitting = true
     rain.local_coords = false
     add_child(rain)
-    # A moving layered cloud deck gives the panorama sky an actual storm state.
-    cloud_material = StandardMaterial3D.new()
-    cloud_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-    cloud_material.albedo_color = Color(0.16, 0.20, 0.27, 0.0)
-    cloud_material.roughness = 1.0
-    cloud_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-    cloud_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-    for offset in [Vector3(-48, 28, -35), Vector3(26, 32, -52), Vector3(0, 25, 35)]:
+    # Three shader-driven cloud layers. The procedural FBM shader gives storm
+    # coverage and motion instead of the previous opaque primitive clouds.
+    cloud_material = ShaderMaterial.new()
+    cloud_material.shader = preload("res://shaders/StormClouds.gdshader")
+    cloud_material.set_shader_parameter("storm_amount", 0.0)
+    var cloud_heights: Array[float] = [26.0, 34.0, 43.0]
+    var cloud_seeds: Array[float] = [0.0, 17.3, 41.7]
+    for cloud_index in cloud_heights.size():
         var cloud := MeshInstance3D.new()
-        var cloud_mesh := SphereMesh.new()
-        cloud_mesh.radial_segments = 32
-        cloud_mesh.rings = 12
+        var cloud_mesh := PlaneMesh.new()
+        cloud_mesh.size = Vector2(280.0, 280.0)
         cloud.mesh = cloud_mesh
-        cloud.material_override = cloud_material
-        cloud.scale = Vector3(68, 7, 48)
-        cloud.position = offset
+        var layer_material := cloud_material.duplicate() as ShaderMaterial
+        layer_material.set_shader_parameter("layer_seed", cloud_seeds[cloud_index])
+        cloud.material_override = layer_material
+        cloud.position = Vector3(0, cloud_heights[cloud_index], 0)
         add_child(cloud)
         storm_clouds.append(cloud)
 
@@ -253,7 +253,7 @@ func _input(event: InputEvent) -> void:
         elif event.keycode == KEY_2 or event.physical_keycode == KEY_2:
             _select_weather("Лёгкий ветер", 0.72, 0.75, 0.08)
         elif event.keycode == KEY_3 or event.physical_keycode == KEY_3:
-            _select_weather("Шторм", 1.35, 1.70, -0.18)
+            _select_weather("Шторм", 0.92, 1.05, -0.18)
 
 func _physics_process(delta: float) -> void:
     elapsed += delta
@@ -264,7 +264,7 @@ func _physics_process(delta: float) -> void:
     elif Input.is_action_just_pressed("weather_breeze"):
         _select_weather("Лёгкий ветер", 0.72, 0.75, 0.08)
     elif Input.is_action_just_pressed("weather_storm"):
-        _select_weather("Шторм", 1.35, 1.70, -0.18)
+        _select_weather("Шторм", 0.92, 1.05, -0.18)
     # The three wave-profile values, light, fog and rain blend continuously.
     weather_strength = move_toward(weather_strength, weather_target, delta * 0.13)
     weather_chop = move_toward(weather_chop, weather_chop_target, delta * 0.17)
@@ -298,11 +298,13 @@ func _apply_weather() -> void:
     sun.light_color = Color("ffd1a0").lerp(Color("a7b7ce"), storm_ratio)
     rain.global_position = ship.global_position + Vector3(0, 13, 0)
     rain.amount_ratio = smoothstep(0.38, 0.86, storm_ratio)
-    cloud_material.albedo_color = Color(0.16, 0.20, 0.27, lerp(0.0, 0.86, storm_ratio))
     for cloud_index in storm_clouds.size():
-        var cloud := storm_clouds[cloud_index]
-        var offsets := [Vector3(-48, 28, -35), Vector3(26, 32, -52), Vector3(0, 25, 35)]
-        cloud.global_position = ship.global_position + offsets[cloud_index]
+        var cloud: MeshInstance3D = storm_clouds[cloud_index]
+        var cloud_heights: Array[float] = [26.0, 34.0, 43.0]
+        cloud.global_position = ship.global_position + Vector3(0, cloud_heights[cloud_index], 0)
+        var layer_material := cloud.material_override as ShaderMaterial
+        if layer_material != null:
+            layer_material.set_shader_parameter("storm_amount", storm_ratio)
     for tile in ocean.get_children():
         if tile is MeshInstance3D:
             var water_material := (tile as MeshInstance3D).get_active_material(0) as ShaderMaterial

@@ -16,14 +16,14 @@ var boost_input: bool = false
 var speed_knots: float = 0.0
 var submerged_fraction: float = 0.0
 
-@export var buoyancy_stiffness: float = 560.0
-@export var buoyancy_damping: float = 155.0
+@export var buoyancy_stiffness: float = 7200.0
+@export var buoyancy_damping: float = 1850.0
 @export var linear_water_drag: float = 28.0
 @export var quadratic_water_drag: float = 22.0
 @export var angular_water_drag: float = 95.0
 @export var engine_force: float = 680.0
 @export var rudder_force: float = 310.0
-@export var slam_coefficient: float = 105.0
+@export var slam_coefficient: float = 90.0
 
 func _ready() -> void:
     mass = 145.0
@@ -53,11 +53,14 @@ func _physics_process(_delta: float) -> void:
         var lever_velocity: Vector3 = linear_velocity + angular_velocity.cross(global_transform.basis * probe)
         var relative_vertical: float = water_vertical_velocity - lever_velocity.y
         # Archimedes-like restoring force plus a velocity term prevents bouncing.
-        var lift: float = depth * buoyancy_stiffness + relative_vertical * buoyancy_damping
-        var buoyancy: Vector3 = Vector3.UP * maxf(lift, 0.0)
-        # A fast downward hull impact produces extra upward slamming force.
+        # Distribute capped total lift over every pontoon. Without this division,
+        # one force per pontoon multiplies buoyancy and can launch the hull.
+        var lift_total: float = clampf(depth * buoyancy_stiffness + relative_vertical * buoyancy_damping, 0.0, 5200.0)
+        var buoyancy: Vector3 = Vector3.UP * (lift_total / float(PROBES.size()))
+        # Impact force is also capped and distributed to avoid storm catapults.
         var impact_speed: float = maxf(relative_vertical, 0.0)
-        var slam: Vector3 = Vector3.UP * impact_speed * impact_speed * slam_coefficient
+        var slam_total: float = minf(impact_speed * impact_speed * slam_coefficient, 1100.0)
+        var slam: Vector3 = Vector3.UP * (slam_total / float(PROBES.size()))
         apply_force(buoyancy + slam, probe)
 
         # Hydrodynamic resistance opposes relative water velocity. The quadratic
@@ -75,9 +78,10 @@ func _physics_process(_delta: float) -> void:
         # Propeller thrust is applied low and aft; it pitches the bow subtly at speed.
         apply_force(forward * throttle_input * engine_force * thrust_scale, Vector3(0.0, -0.35, 3.0))
         # A rudder only bites when water flows past it. This avoids arcade turns at rest.
-        var rudder_bite: float = clampf(absf(forward_speed) / 5.0, 0.0, 1.0)
+        var rudder_bite: float = clampf(absf(forward_speed) / 2.0, 0.22, 1.0)
         var side: Vector3 = global_transform.basis.x.normalized()
-        apply_force(side * steering_input * rudder_force * rudder_bite * signf(forward_speed), Vector3(0.0, -0.45, 3.65))
+        var turn_direction: float = signf(forward_speed) if absf(forward_speed) > 0.05 else 1.0
+        apply_force(side * steering_input * rudder_force * rudder_bite * turn_direction, Vector3(0.0, -0.45, 3.65))
         apply_torque(-angular_velocity * angular_water_drag * submerged_fraction)
 
     speed_knots = linear_velocity.length() * 1.94384
