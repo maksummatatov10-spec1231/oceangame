@@ -1,12 +1,14 @@
 extends Node3D
 
-const OCEAN_SHADER := preload("res://shaders/ocean.gdshader")
+const OCEAN_SCENE := preload("res://Scenes/Ocean.tscn")
+const SUNSET_PANORAMA := preload("res://Resources/AllSkyFree_Sky_EpicBlueSunset_Equirect.png")
 const MAX_SPEED := 18.0
 const REVERSE_SPEED := 6.0
 const ACCELERATION := 4.5
 const TURN_SPEED := 1.35
 
 var ship: Node3D
+var ocean: Node3D
 var sailor: Node3D
 var camera: Camera3D
 var speed := 0.0
@@ -28,11 +30,9 @@ func _ready() -> void:
     _create_interface()
 
 func _create_environment() -> void:
-    var sky_material := ProceduralSkyMaterial.new()
-    sky_material.sky_top_color = Color("091d45")
-    sky_material.sky_horizon_color = Color("f19a70")
-    sky_material.ground_bottom_color = Color("061226")
-    sky_material.ground_horizon_color = Color("4c7197")
+    # This panorama is supplied in ассеты2.zip and is now used by the game.
+    var sky_material := PanoramaSkyMaterial.new()
+    sky_material.panorama = SUNSET_PANORAMA
     var sky := Sky.new()
     sky.sky_material = sky_material
     var environment := Environment.new()
@@ -58,24 +58,16 @@ func _create_environment() -> void:
     add_child(sun)
 
 func _create_ocean() -> void:
-    var material := ShaderMaterial.new()
-    material.shader = OCEAN_SHADER
-    for x in range(-2, 3):
-        for z in range(-2, 3):
-            var water := MeshInstance3D.new()
-            var plane := PlaneMesh.new()
-            plane.size = Vector2(150.0, 150.0)
-            plane.subdivide_width = 32
-            plane.subdivide_depth = 32
-            water.mesh = plane
-            water.material_override = material
-            water.position = Vector3(x * 149.0, 0, z * 149.0)
-            add_child(water)
+    # Uses the original 17-tile infinite ocean, WaterPlane scene and Water shader
+    # extracted from ассеты1.zip. Ocean.gd updates the ocean_pos shader global.
+    ocean = OCEAN_SCENE.instantiate()
+    ocean.name = "AssetOcean"
+    add_child(ocean)
 
 func _create_ship() -> void:
     ship = Node3D.new()
     ship.name = "PlayerShip"
-    ship.position = Vector3(0, 0.65, 10)
+    ship.position = Vector3(0, 1.35, 10)
     add_child(ship)
     var wood := _material(Color("4b2417"), 0.78)
     var dark_wood := _material(Color("24100c"), 0.82)
@@ -197,9 +189,10 @@ func _physics_process(delta: float) -> void:
     if abs(speed) > 0.1:
         heading -= steering * TURN_SPEED * delta * clamp(abs(speed) / 5.0, 0.25, 1.4) * sign(speed)
     ship.rotation.y = heading
+    ocean.global_position = Vector3(ship.global_position.x, 0.0, ship.global_position.z)
     var forward := -ship.global_transform.basis.z
     ship.position += forward * speed * delta
-    ship.position.y = 0.72 + _wave_height(ship.position.x, ship.position.z) * 0.28
+    ship.position.y = 1.35 + _wave_height(ship.position.x, ship.position.z) * 0.18
     ship.rotation.x = sin(elapsed * 1.3 + ship.position.z * 0.06) * 0.045
     ship.rotation.z = sin(elapsed * 1.1 + ship.position.x * 0.05) * 0.055
     sailor.position.y = 0.75 + sin(elapsed * 2.2) * 0.025
@@ -241,11 +234,11 @@ func _material(color: Color, roughness: float = 0.75, emission_energy: float = 0
         material.emission_energy_multiplier = emission_energy
     return material
 
-func _mesh(parent: Node3D, mesh: Mesh, material: Material, location: Vector3, scale := Vector3.ONE) -> MeshInstance3D:
+func _mesh(parent: Node3D, mesh: Mesh, material: Material, location: Vector3, mesh_scale := Vector3.ONE) -> MeshInstance3D:
     var instance := MeshInstance3D.new()
     instance.mesh = mesh
     instance.material_override = material
     instance.position = location
-    instance.scale = scale
+    instance.scale = mesh_scale
     parent.add_child(instance)
     return instance

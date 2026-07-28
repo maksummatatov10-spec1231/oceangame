@@ -25,3 +25,9 @@ turn_left={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":65),
 turn_right={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":68), Object(InputEventKey,"physical_keycode":4194321)]}
 boost={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":4194325)]}
 restart={"deadzone":0.5,"events":[Object(InputEventKey,"physical_keycode":82)]}
+
+[shader_globals]
+ocean_pos={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
