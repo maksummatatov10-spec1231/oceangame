@@ -29,6 +29,8 @@ var weather_turn_target := 0.08
 var weather_name := "Лёгкий ветер"
 var weather_label: Label
 var rain: GPUParticles3D
+var storm_clouds: Array[MeshInstance3D] = []
+var cloud_material: StandardMaterial3D
 
 func _ready() -> void:
     _create_environment()
@@ -75,17 +77,40 @@ func _create_environment() -> void:
     rain_process.initial_velocity_min = 16.0
     rain_process.initial_velocity_max = 23.0
     rain_process.gravity = Vector3(0, -8, 0)
+    rain_process.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+    rain_process.emission_box_extents = Vector3(28, 0.2, 28)
     var rain_drop := QuadMesh.new()
     rain_drop.size = Vector2(0.025, 0.65)
     var rain_material := StandardMaterial3D.new()
     rain_material.albedo_color = Color(0.67, 0.82, 0.96, 0.48)
     rain_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
     rain_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    rain_material.billboard_mode = BaseMaterial3D.BILLBOARD_ENABLED
     rain_drop.material = rain_material
     rain.process_material = rain_process
     rain.draw_pass_1 = rain_drop
     rain.amount_ratio = 0.0
+    rain.emitting = true
+    rain.local_coords = false
     add_child(rain)
+    # A moving layered cloud deck gives the panorama sky an actual storm state.
+    cloud_material = StandardMaterial3D.new()
+    cloud_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+    cloud_material.albedo_color = Color(0.16, 0.20, 0.27, 0.0)
+    cloud_material.roughness = 1.0
+    cloud_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+    cloud_material.cull_mode = BaseMaterial3D.CULL_DISABLED
+    for offset in [Vector3(-48, 28, -35), Vector3(26, 32, -52), Vector3(0, 25, 35)]:
+        var cloud := MeshInstance3D.new()
+        var cloud_mesh := SphereMesh.new()
+        cloud_mesh.radial_segments = 32
+        cloud_mesh.rings = 12
+        cloud.mesh = cloud_mesh
+        cloud.material_override = cloud_material
+        cloud.scale = Vector3(68, 7, 48)
+        cloud.position = offset
+        add_child(cloud)
+        storm_clouds.append(cloud)
 
 func _create_ocean() -> void:
     # Keeps the original 17-tile infinite LOD layout from ассеты1.zip, now
@@ -205,7 +230,7 @@ func _create_interface() -> void:
     weather_label.add_theme_color_override("font_color", Color("d5e8f5"))
     layer.add_child(weather_label)
     var controls := Label.new()
-    controls.text = "W / S — ход   A / D — штурвал   Shift — полный ход   1/2/3 — погода   R — заново"
+    controls.text = "W/S — ход   A/D — штурвал   Shift — полный ход   1 — штиль   2 — ветер   3 — шторм   R — заново"
     controls.position = Vector2(30, 680)
     controls.add_theme_font_size_override("font_size", 15)
     controls.add_theme_color_override("font_color", Color("d5e8f5"))
@@ -221,7 +246,7 @@ func _create_interface() -> void:
     layer.add_child(message_label)
 
 
-func _unhandled_key_input(event: InputEvent) -> void:
+func _input(event: InputEvent) -> void:
     if event is InputEventKey and event.pressed and not event.echo:
         if event.keycode == KEY_1 or event.physical_keycode == KEY_1:
             _select_weather("Штиль", 0.28, 0.05, 0.0)
@@ -271,14 +296,20 @@ func _apply_weather() -> void:
     environment.ambient_light_energy = lerp(0.78, 0.34, storm_ratio)
     sun.light_energy = lerp(2.0, 0.65, storm_ratio)
     sun.light_color = Color("ffd1a0").lerp(Color("a7b7ce"), storm_ratio)
-    rain.global_position = ship.global_position + Vector3(0, 12, 0)
-    rain.amount_ratio = smoothstep(0.55, 1.0, storm_ratio)
+    rain.global_position = ship.global_position + Vector3(0, 13, 0)
+    rain.amount_ratio = smoothstep(0.38, 0.86, storm_ratio)
+    cloud_material.albedo_color = Color(0.16, 0.20, 0.27, lerp(0.0, 0.86, storm_ratio))
+    for cloud_index in storm_clouds.size():
+        var cloud := storm_clouds[cloud_index]
+        var offsets := [Vector3(-48, 28, -35), Vector3(26, 32, -52), Vector3(0, 25, 35)]
+        cloud.global_position = ship.global_position + offsets[cloud_index]
     for tile in ocean.get_children():
-        if tile is MeshInstance3D and tile.material_override is ShaderMaterial:
-            var water_material := tile.material_override as ShaderMaterial
-            water_material.set_shader_parameter("wave_strength", weather_strength)
-            water_material.set_shader_parameter("chop_strength", weather_chop)
-            water_material.set_shader_parameter("wind_turn", weather_turn)
+        if tile is MeshInstance3D:
+            var water_material := (tile as MeshInstance3D).get_active_material(0) as ShaderMaterial
+            if water_material != null:
+                water_material.set_shader_parameter("wave_strength", weather_strength)
+                water_material.set_shader_parameter("chop_strength", weather_chop)
+                water_material.set_shader_parameter("wind_turn", weather_turn)
 
 func get_water_sample(world_position: Vector3) -> Dictionary:
     return OceanModel.sample(world_position, elapsed, weather_strength, weather_chop, weather_turn)
