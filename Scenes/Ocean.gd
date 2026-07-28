@@ -1,6 +1,6 @@
 extends Node3D
 
-const OCEAN_TILE := preload("res://Scenes/WaterPlane.tscn")
+const OCEAN_TILE := preload("res://Scenes/RealisticWaterPlane.tscn")
 const SPAWN_INFO := preload("res://Resources/GridSpawnInfo.tres")
 
 # Builds the 17-tile LOD layout supplied with the original ocean asset.

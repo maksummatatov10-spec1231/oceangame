@@ -59,8 +59,8 @@ func _create_environment() -> void:
     add_child(sun)
 
 func _create_ocean() -> void:
-    # Uses the original 17-tile infinite ocean, WaterPlane scene and Water shader
-    # extracted from ассеты1.zip. Ocean.gd updates the ocean_pos shader global.
+    # Keeps the original 17-tile infinite LOD layout from ассеты1.zip, now
+    # rendering with the high-detail Realistic Water texture set supplied later.
     ocean = OCEAN_SCENE.instantiate()
     ocean.name = "AssetOcean"
     # OceanMap from the supplied demo scaled the tile layout by six. Retaining
@@ -225,14 +225,21 @@ func _check_treasures() -> void:
                 message_label.text = "Все маяки найдены — океан ваш, капитан!"
                 message_time = 99.0
 
-# Must mirror large_waves() in shaders/Water.gdshader. Sampling the same
-# mathematical surface at bow, stern and both sides gives stable buoyancy.
+# Must mirror ocean_height() in shaders/RealisticOcean.gdshader. Sampling
+# the same mathematical surface at bow, stern and both sides gives stable buoyancy.
 func _wave_height(x: float, z: float) -> float:
-    var wave_a := 1.80 * sin((x * 0.95 + z * 0.31) * TAU / 21.0 - elapsed * 1.50)
-    var wave_b := 1.15 * sin((x * -0.38 + z * 0.925) * TAU / 13.0 - elapsed * 2.10)
-    var wave_c := 0.75 * sin((x * 0.72 + z * -0.694) * TAU / 7.0 - elapsed * 2.80)
-    var wave_d := 0.30 * sin((x * -0.16 + z * 0.987) * TAU / 3.5 - elapsed * 4.00)
-    return wave_a + wave_b + wave_c + wave_d
+    return (
+        _gerstner_height(x, z, Vector2(0.92, 0.38), 1.45, 25.0, 2.40)
+        + _gerstner_height(x, z, Vector2(-0.35, 0.94), 1.10, 17.0, 3.10)
+        + _gerstner_height(x, z, Vector2(0.72, -0.69), 0.75, 11.0, 4.00)
+        + _gerstner_height(x, z, Vector2(-0.82, -0.57), 0.48, 7.0, 5.20)
+        + _gerstner_height(x, z, Vector2(0.15, 0.99), 0.27, 4.3, 6.50)
+        + _gerstner_height(x, z, Vector2(-0.98, 0.20), 0.16, 2.2, 8.00)
+    )
+
+func _gerstner_height(x: float, z: float, direction: Vector2, amplitude: float, wavelength: float, phase_speed: float) -> float:
+    var phase := TAU / wavelength * direction.normalized().dot(Vector2(x, z)) - elapsed * phase_speed
+    return amplitude * sin(phase)
 
 func _apply_buoyancy(delta: float, forward: Vector3) -> void:
     var right := Vector3(cos(heading), 0.0, -sin(heading))
