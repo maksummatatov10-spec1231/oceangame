@@ -4,10 +4,10 @@ extends RigidBody3D
 # Eight pontoons sample the same CPU mirror of the shader wave function.
 # Applying each force at its local point naturally produces pitch and roll.
 const PROBES := [
-    Vector3(-1.35, -0.68, -3.45), Vector3(1.35, -0.68, -3.45),
-    Vector3(-1.55, -0.70, -1.25), Vector3(1.55, -0.70, -1.25),
-    Vector3(-1.55, -0.70, 1.25), Vector3(1.55, -0.70, 1.25),
-    Vector3(-1.30, -0.68, 3.35), Vector3(1.30, -0.68, 3.35),
+    Vector3(-1.30, -0.70, -3.55), Vector3(0, -0.75, -3.65), Vector3(1.30, -0.70, -3.55),
+    Vector3(-1.55, -0.73, -1.30), Vector3(0, -0.78, -1.25), Vector3(1.55, -0.73, -1.30),
+    Vector3(-1.55, -0.73, 1.25), Vector3(0, -0.78, 1.25), Vector3(1.55, -0.73, 1.25),
+    Vector3(-1.30, -0.70, 3.35), Vector3(0, -0.75, 3.48), Vector3(1.30, -0.70, 3.35),
 ]
 
 var ocean: Node
@@ -24,6 +24,7 @@ var submerged_fraction := 0.0
 @export var angular_water_drag := 95.0
 @export var engine_force := 680.0
 @export var rudder_force := 310.0
+@export var slam_coefficient := 105.0
 
 func _ready() -> void:
     mass = 145.0
@@ -53,7 +54,9 @@ func _physics_process(_delta: float) -> void:
         # Archimedes-like restoring force plus a velocity term prevents bouncing.
         var lift := depth * buoyancy_stiffness + relative_vertical * buoyancy_damping
         var buoyancy := Vector3.UP * max(lift, 0.0)
-        apply_force(buoyancy, probe)
+        # A fast downward hull impact produces extra upward slamming force.
+        var slam := Vector3.UP * max(relative_vertical, 0.0) * max(relative_vertical, 0.0) * slam_coefficient
+        apply_force(buoyancy + slam, probe)
 
         # Hydrodynamic resistance opposes relative water velocity. The quadratic
         # component makes high-speed motion through waves much more expensive.

@@ -22,6 +22,10 @@ var environment: Environment
 var sun: DirectionalLight3D
 var weather_strength := 0.72
 var weather_target := 0.72
+var weather_chop := 0.75
+var weather_chop_target := 0.75
+var weather_turn := 0.08
+var weather_turn_target := 0.08
 var weather_name := "Лёгкий ветер"
 var weather_label: Label
 var rain: GPUParticles3D
@@ -216,18 +220,30 @@ func _create_interface() -> void:
     message_label.add_theme_color_override("font_color", Color("fff1c5"))
     layer.add_child(message_label)
 
+
+func _unhandled_key_input(event: InputEvent) -> void:
+    if event is InputEventKey and event.pressed and not event.echo:
+        if event.keycode == KEY_1 or event.physical_keycode == KEY_1:
+            _select_weather("Штиль", 0.28, 0.05, 0.0)
+        elif event.keycode == KEY_2 or event.physical_keycode == KEY_2:
+            _select_weather("Лёгкий ветер", 0.72, 0.75, 0.08)
+        elif event.keycode == KEY_3 or event.physical_keycode == KEY_3:
+            _select_weather("Шторм", 1.35, 1.70, -0.18)
+
 func _physics_process(delta: float) -> void:
     elapsed += delta
     if Input.is_action_just_pressed("restart"):
         get_tree().reload_current_scene()
     if Input.is_action_just_pressed("weather_calm"):
-        _select_weather("Штиль", 0.28)
+        _select_weather("Штиль", 0.28, 0.05, 0.0)
     elif Input.is_action_just_pressed("weather_breeze"):
-        _select_weather("Лёгкий ветер", 0.72)
+        _select_weather("Лёгкий ветер", 0.72, 0.75, 0.08)
     elif Input.is_action_just_pressed("weather_storm"):
-        _select_weather("Шторм", 1.35)
-    # Eight seconds from calm to storm: water, light and fog transition together.
+        _select_weather("Шторм", 1.35, 1.70, -0.18)
+    # The three wave-profile values, light, fog and rain blend continuously.
     weather_strength = move_toward(weather_strength, weather_target, delta * 0.13)
+    weather_chop = move_toward(weather_chop, weather_chop_target, delta * 0.17)
+    weather_turn = move_toward(weather_turn, weather_turn_target, delta * 0.06)
     _apply_weather()
     ocean.global_position = Vector3(ship.global_position.x, 0.0, ship.global_position.z)
     _update_camera(delta)
@@ -240,9 +256,11 @@ func _physics_process(delta: float) -> void:
         if message_time <= 0.0:
             message_label.text = ""
 
-func _select_weather(title: String, strength: float) -> void:
+func _select_weather(title: String, strength: float, chop: float, turn: float) -> void:
     weather_name = title
     weather_target = strength
+    weather_chop_target = chop
+    weather_turn_target = turn
     message_time = 3.0
     message_label.text = "Погода меняется: %s" % title
 
@@ -257,10 +275,13 @@ func _apply_weather() -> void:
     rain.amount_ratio = smoothstep(0.55, 1.0, storm_ratio)
     for tile in ocean.get_children():
         if tile is MeshInstance3D and tile.material_override is ShaderMaterial:
-            (tile.material_override as ShaderMaterial).set_shader_parameter("wave_strength", weather_strength)
+            var water_material := tile.material_override as ShaderMaterial
+            water_material.set_shader_parameter("wave_strength", weather_strength)
+            water_material.set_shader_parameter("chop_strength", weather_chop)
+            water_material.set_shader_parameter("wind_turn", weather_turn)
 
 func get_water_sample(world_position: Vector3) -> Dictionary:
-    return OceanModel.sample(world_position, elapsed, weather_strength)
+    return OceanModel.sample(world_position, elapsed, weather_strength, weather_chop, weather_turn)
 
 func _update_camera(delta: float) -> void:
     var desired := ship.global_position + ship.global_transform.basis.z * 13.5 + Vector3(0, 7.5, 0)

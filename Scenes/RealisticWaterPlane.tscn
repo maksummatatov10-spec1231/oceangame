@@ -24,6 +24,8 @@ shader_parameter/crest_color = Color(0.63, 0.88, 0.93, 1)
 shader_parameter/normal_strength = 1.15
 shader_parameter/foam_strength = 0.16
 shader_parameter/wave_strength = 0.72
+shader_parameter/chop_strength = 0.75
+shader_parameter/wind_turn = 0.08
 
 [node name="RealisticWaterPlane" type="MeshInstance3D"]
 mesh = SubResource("PlaneMesh_ocean")
