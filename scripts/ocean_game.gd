@@ -62,6 +62,10 @@ func _create_ocean() -> void:
     # extracted from ассеты1.zip. Ocean.gd updates the ocean_pos shader global.
     ocean = OCEAN_SCENE.instantiate()
     ocean.name = "AssetOcean"
+    # OceanMap from the supplied demo scaled the tile layout by six. Retaining
+    # that scale prevents the high-detail centre tile from looking like a tiny
+    # disc around the ship and keeps the LOD rings far beyond the camera.
+    ocean.scale = Vector3(6.0, 1.0, 6.0)
     add_child(ocean)
 
 func _create_ship() -> void:

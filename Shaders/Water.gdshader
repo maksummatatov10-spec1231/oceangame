@@ -97,43 +97,27 @@ void vertex() {
 }
 
 void fragment() {
-	// Depth variables and calc
-	float raw_depth = texture(depth_texture, SCREEN_UV).r * 2.0 - 1.0;
-	float depth = PROJECTION_MATRIX[3][2] / (raw_depth + PROJECTION_MATRIX[2][2]);
-	float depth_blend = exp((depth+VERTEX.z + depth_offset) * -beers_law);
-	depth_blend = clamp(1.0 - depth_blend, 0.0, 1.0);	
-	float depth_blend_power = clamp(pow(depth_blend, 2.5), 0.0, 1.0);
-
-	// Retrieving depth color and applying the deep and shallow colors
-	vec3 screen_color = textureLod(screen_texture, SCREEN_UV, depth_blend_power * 2.5).rgb;
-	vec3 depth_color = mix(color_shallow.rgb, color_deep.rgb, depth_blend_power);
-	vec3 color = mix(screen_color * depth_color, depth_color * 0.25, depth_blend_power * 0.5);
-	
-	// Getting edge depth calc
-	float z_depth = edge(texture(depth_texture, SCREEN_UV).x);
-	float z_pos = edge(FRAGCOORD.z);
-	float z_dif = z_depth - z_pos;
-	
-	// Time calculations for wave (normal map) movement
-	vec2 time = (TIME * wave_direction) * time_scale; // Movement rate of first wave
-	vec2 time2 = (TIME * wave_direction2) * time_scale; // Movement rate of second wave
-	
-	// Blend normal maps into one
-	vec3 normal_blend = mix(texture(texture_normal,world_pos.xz / 10.0 + time / 10.0).rgb, texture(texture_normal2,world_pos.xz / 10.0 + time2 / 10.0).rgb, 0.5);
-	
-	// Blend Wave1 and Wave2 maps
-	vec3 wave_normal_blend = mix(texture(wave_bump, world_pos.xz / noise_scale + time).xyz,texture(wave_bump, world_pos.xz / noise_scale + time2).xyz,0.3);
-	
-	// Calculate Fresnel
-	float fresnel = fresnel(5.0, NORMAL, VIEW);
-	vec3 surface_color = mix(albedo, albedo2, fresnel); // Interpolate albedo values by frensel
-	
-	// Add Edge Color to Surface Color Albedo
-	vec3 depth_color_adj = mix(edge_color, color, step(edge_scale, z_dif));
-	
-	ALBEDO = clamp(surface_color + depth_color_adj,vec3(0.0),vec3(1.0));
+	// The supplied shader's original depth/edge blend painted empty ocean white:
+	// with no sea floor in the depth buffer it selected edge_color around the player.
+	// Keep the asset's procedural wave and normal textures, but use a stable
+	// deep-water surface colour for open ocean.
+	vec2 time = (TIME * wave_direction) * time_scale;
+	vec2 time2 = (TIME * wave_direction2) * time_scale;
+	vec3 normal_blend = mix(
+		texture(texture_normal, world_pos.xz / 10.0 + time / 10.0).rgb,
+		texture(texture_normal2, world_pos.xz / 10.0 + time2 / 10.0).rgb,
+		0.5
+	);
+	vec3 wave_normal_blend = mix(
+		texture(wave_bump, world_pos.xz / noise_scale + time).xyz,
+		texture(wave_bump, world_pos.xz / noise_scale + time2).xyz,
+		0.3
+	);
+	float rim = fresnel(5.0, NORMAL, VIEW);
+	float moving_crest = clamp(wave_normal_blend.r * 0.22, 0.0, 0.22);
+	ALBEDO = mix(albedo, albedo2, clamp(rim * 0.72 + moving_crest, 0.0, 1.0));
 	METALLIC = metallic;
 	ROUGHNESS = roughness;
 	NORMAL_MAP = mix(wave_normal_blend, normal_blend, 0.5);
-	SPECULAR = wave_normal_blend.r;
+	SPECULAR = 0.62;
 }
