@@ -1,31 +1,31 @@
 extends Node3D
 
 const OCEAN_TILE := preload("res://Scenes/RealisticWaterPlane.tscn")
-const SPAWN_INFO := preload("res://Resources/GridSpawnInfo.tres")
+# A uniform near-field grid avoids the visible LOD ring produced when very tall
+# vertex waves meet the low-subdivision outer tiles of the original demo.
+const TILE_SIZE := 80.0
+const TILES_PER_AXIS := 3
+const TILE_SUBDIVISIONS := 128
+const HALF_GRID := 1
 
-# Builds the 17-tile LOD layout supplied with the original ocean asset.
 func _ready() -> void:
     create_ocean_tiles()
 
+# An endless, camera-centred ocean: every tile has identical geometry density,
+# so the shader displacement is continuous across each seam.
 func create_ocean_tiles() -> void:
     for child in get_children():
         child.queue_free()
-    # GridSpawnInfo is a scripted Resource; get() keeps this scene independent
-    # from editor load order while retaining the source asset's exact layout.
-    var spawn_points: Array = SPAWN_INFO.get("spawnPoints")
-    var subdivision_levels: Array = SPAWN_INFO.get("subdivision")
-    var tile_scales: Array = SPAWN_INFO.get("scale")
-    for index in spawn_points.size():
-        var spawn_location: Vector2 = spawn_points[index]
-        var subdivisions: int = subdivision_levels[index]
-        var tile_scale: int = tile_scales[index]
-        var tile: MeshInstance3D = OCEAN_TILE.instantiate() as MeshInstance3D
-        var plane: PlaneMesh = tile.mesh as PlaneMesh
-        add_child(tile)
-        tile.position = Vector3(spawn_location.x, 0.0, spawn_location.y) * 10.05
-        plane.subdivide_width = subdivisions
-        plane.subdivide_depth = subdivisions
-        tile.scale = Vector3(tile_scale, 1.0, tile_scale)
+    for grid_x in range(-HALF_GRID, HALF_GRID + 1):
+        for grid_z in range(-HALF_GRID, HALF_GRID + 1):
+            var tile: MeshInstance3D = OCEAN_TILE.instantiate() as MeshInstance3D
+            var plane: PlaneMesh = tile.mesh as PlaneMesh
+            plane.size = Vector2(TILE_SIZE, TILE_SIZE)
+            plane.subdivide_width = TILE_SUBDIVISIONS
+            plane.subdivide_depth = TILE_SUBDIVISIONS
+            tile.position = Vector3(grid_x * TILE_SIZE, 0.0, grid_z * TILE_SIZE)
+            add_child(tile)
 
 func _process(_delta: float) -> void:
+    # Preserved for compatibility with the original extracted ocean shader.
     RenderingServer.global_shader_parameter_set("ocean_pos", global_position)

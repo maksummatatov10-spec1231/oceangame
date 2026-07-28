@@ -63,10 +63,8 @@ func _create_ocean() -> void:
     # rendering with the high-detail Realistic Water texture set supplied later.
     ocean = OCEAN_SCENE.instantiate()
     ocean.name = "AssetOcean"
-    # OceanMap from the supplied demo scaled the tile layout by six. Retaining
-    # that scale prevents the high-detail centre tile from looking like a tiny
-    # disc around the ship and keeps the LOD rings far beyond the camera.
-    ocean.scale = Vector3(6.0, 1.0, 6.0)
+    # Ocean uses a uniform, camera-centred grid. Unlike the source demo's
+    # mixed LOD ring, it has no moving subdivision seam around the ship.
     add_child(ocean)
 
 func _create_ship() -> void:
@@ -229,12 +227,12 @@ func _check_treasures() -> void:
 # the same mathematical surface at bow, stern and both sides gives stable buoyancy.
 func _wave_height(x: float, z: float) -> float:
     return (
-        _gerstner_height(x, z, Vector2(0.93, 0.37), 0.42, 55.0, 1.25)
-        + _gerstner_height(x, z, Vector2(0.96, 0.28), 0.28, 40.0, 1.45)
-        + _gerstner_height(x, z, Vector2(0.89, 0.46), 0.17, 27.0, 1.75)
-        + _gerstner_height(x, z, Vector2(0.98, 0.18), 0.10, 18.0, 2.10)
-        + _gerstner_height(x, z, Vector2(0.92, 0.39), 0.05, 10.0, 2.45)
-        + _gerstner_height(x, z, Vector2(0.87, 0.49), 0.03, 6.0, 2.80)
+        _gerstner_height(x, z, Vector2(0.93, 0.37), 0.16, 65.0, 0.85)
+        + _gerstner_height(x, z, Vector2(0.96, 0.28), 0.10, 48.0, 1.00)
+        + _gerstner_height(x, z, Vector2(0.89, 0.46), 0.06, 32.0, 1.25)
+        + _gerstner_height(x, z, Vector2(0.98, 0.18), 0.035, 22.0, 1.45)
+        + _gerstner_height(x, z, Vector2(0.92, 0.39), 0.015, 13.0, 1.70)
+        + _gerstner_height(x, z, Vector2(0.87, 0.49), 0.008, 7.0, 1.95)
     )
 
 func _gerstner_height(x: float, z: float, direction: Vector2, amplitude: float, wavelength: float, phase_speed: float) -> float:
