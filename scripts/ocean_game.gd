@@ -102,6 +102,7 @@ func _create_ship() -> void:
     _create_sailor(sailor)
     camera = Camera3D.new()
     camera.fov = 67.0
+    camera.current = true
     add_child(camera)
     camera.position = ship.position + Vector3(0, 7, 14)
 
